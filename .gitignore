@@ -1,0 +1,10 @@
+# ignore:
+*.pyc
+*~
+c
+*.ini
+!default.ini
+*.sh
+*.out
+*.log
+.DS_Store
