@@ -146,14 +146,14 @@ def get_slicing_points_and_offset(root_path, band_type, nzcorrs):
         print 'Could not load borders of bands and initial guess.'
         exit()
     
-    if band_type == 'BB':
+    if band_type == 'EB':
         initial_band_powers_EE = np.loadtxt(path_in + 'initial_guess_EE.dat', usecols=(3,))
-        #slicing_points_EE = [0, initial_band_powers_EE.size]
-        # factor 4 because of 2 redshift_bins per band
-        # TODO: generally these factors should be changed to nzbins(nzbins+1)/2 instead of nzbins^2:
+        initial_band_powers_BB = np.loadtxt(path_in + 'initial_guess_BB.dat', usecols=(3,))
+        slicing_points = [nzcorrs * (initial_band_powers_EE.size + initial_band_powers_BB.size), nzcorrs * (initial_band_powers.size + initial_band_powers_EE.size + initial_band_powers_BB.size)]
+    elif band_type == 'BB':
+        initial_band_powers_EE = np.loadtxt(path_in + 'initial_guess_EE.dat', usecols=(3,))
         slicing_points = [nzcorrs * initial_band_powers_EE.size, nzcorrs * (initial_band_powers.size + initial_band_powers_EE.size)]
     elif band_type == 'EE':
-        # factor 4 because of 2 redshift_bins per band
         slicing_points = [0, nzcorrs * initial_band_powers.size]
    
     # EE: e.g. 7; BB: e.g. 6
@@ -182,13 +182,23 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
         #identifier = 'sigma{:.2f}_'.format(para.sigma_int) + para.patches[i]
         redshift_id = correlation #'z{:}xz{:}'.format(index_zbin1+1, index_zbin2+1)
         print redshift_id        
-        fname = path_in + 'all_estimates_band_powers_' + band_type + '_' + redshift_id + '.dat'
+        fname = path_in + 'all_estimates_band_powers_{:}_{:}'.format(band_type, redshift_id)
         #print fname
-        powers_of_run = np.loadtxt(fname)
+        # for backwards-compatibility:
+        try:
+            powers_of_run = np.loadtxt(fname + '.dat')
+        except:
+            powers_of_run = np.load(fname + '.npy')
+            
         #print powers_of_run[-1]
-        fname = path_in + 'last_Fisher_matrix.dat'
+        fname = path_in + 'last_Fisher_matrix'
         # We have to load the Fisher matrix and invert it here!
-        Fisher = np.load(fname)
+        # for backwards-compatibility:
+        try:
+            Fisher = np.loadtxt(fname + '.dat')
+        except:
+            Fisher = np.loadtxt(fname + '.npy')
+            
         # avoid any unnecessary matrix inversion for the sake of less numerical noise...
         # we treat the diagonal of the fisher matrix as inv_variance!
         # I should also invert the sliced Fisher matrix, again due to minimize numerical noise...
@@ -196,8 +206,12 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
         #print inv_Fisher.shape
         
         if para.plot_band_window_functions:
-            fname = path_in + 'band_window_matrix_nell{:}.dat'.format(int(para.ell_nodes))
-            band_window_matrix = np.loadtxt(fname)
+            fname = path_in + 'band_window_matrix_nell{:}'.format(int(para.ell_nodes))
+            # for backwards-compatibility:    
+            try:
+                band_window_matrix = np.loadtxt(fname + '.dat')
+            except:
+                band_window_matrix = np.load(fname + '.npy')
             fname = path_in + 'multipole_nodes_for_band_window_functions_nell{:}.dat'.format(int(para.ell_nodes))
             l_intp_bwm = np.loadtxt(fname)
         else:
@@ -206,8 +220,12 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
             l_intp_bwm = 0.
         collect_bwm.append(band_window_matrix)
         # convergence criteria are only for EE bands!
-        fname = path_in + 'difference_band_powers_EE_' + redshift_id + '.dat'
-        conv = np.loadtxt(fname)
+        fname = path_in + 'difference_band_powers_EE_{:}'.format(redshift_id)
+        # for backwards-compatibility:    
+        try:
+            conv = np.loadtxt(fname + '.dat')
+        except:
+            conv = np.load(fname + '.npy')
         #print np.shape(conv)
         # this slices between bands (currently EE, BB)
         print band_type
@@ -222,25 +240,29 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
         # this won't work with KiDS450 data...        
         if para.external_covariance:
             if para.type_ext_cov == 'clones':
-                fname = para.root_in_ext_cov + '/clones/good/sigma_int{:.2f}/'.format(para.sigma_int) + para.redshift_cut + '/M0_to_M183/covariance_all_z_clones_EE_' + para.patches[i][-2:] + '.npy'
+                fname = para.root_in_ext_cov + '/clones/good/sigma_int{:.2f}/'.format(para.sigma_int) + para.redshift_cut + '/M0_to_M183/covariance_all_z_clones_EE_' + para.patches[i][-2:]
             elif para.type_ext_cov == 'grfs':
-                fname = para.root_in_ext_cov + '/grfs_' + para.patches[i][-2:] + '_flip/good/sigma_int{:.2f}/'.format(para.sigma_int) + para.redshift_cut + '/G1_to_G184_' + para.patches[i][-2:] + '/covariance_all_z_grfs_EE_' + para.patches[i][-2:] + '.npy'
+                fname = para.root_in_ext_cov + '/grfs_' + para.patches[i][-2:] + '_flip/good/sigma_int{:.2f}/'.format(para.sigma_int) + para.redshift_cut + '/G1_to_G184_' + para.patches[i][-2:] + '/covariance_all_z_grfs_EE_' + para.patches[i][-2:]
             elif para.type_ext_cov == 'stitched':
-                fname = para.root_in_ext_cov + '/stitched_covariances/full/covariance_all_z_stitched_EE_' + para.patches[i][-2:] + '.npy'    
+                fname = para.root_in_ext_cov + '/stitched_covariances/full/covariance_all_z_stitched_EE_' + para.patches[i][-2:]
             # TODO: for now I'm using the inverse Fisher for B-modes!!!
             elif para.type_ext_cov == 'kids450':
                 # full path must be supplied down to filename (because of blinding!!!)  
                 if band_type == 'EE':
-                    fname = para.root_in_ext_cov + 'covariance_all_z_' + band_type + '.dat'
-                elif band_type == 'BB':
+                    fname = para.root_in_ext_cov + 'covariance_all_z_{:}'.format(band_type)
+                elif band_type == 'BB' or band_type == 'EB':
                     #fname = para.root_in_ext_cov + 'inv_Fisher_avg_BB.npy'
-                    fname = para.root_in_ext_cov + 'covariance_all_z_' + band_type + '.dat'
-            cov_ext = np.loadtxt(fname)
+                    fname = para.root_in_ext_cov + 'covariance_all_z_BB'
+            # for backwards-compatibility:
+            try:
+                cov_ext = np.loadtxt(fname + '.dat')
+            except:
+                cov_ext = np.load(fname + '.npy')
             # take thefull diagonal (for BB we currently use the external EE covariance!)
             variances_ext_bands = np.diag(cov_ext)#[slicing_points[0]:slicing_points[-1]]
         else:
             # just carry zeros around for convenience and less ifs:
-            variances_ext_bands = np.zeros_like(diag_Fisher)
+            variances_ext_bands = np.ones_like(diag_Fisher)
         # TODO: this is hard-linked to current KiDS450 approach (i.e. noise-covariances are saved in data-folders)...
         # TODO: Now we're only using the area to scale everything...
         if para.external_weights:
@@ -268,7 +290,7 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
         print variances_ext_bands, variances_ext_bands.shape 
         print band_type, correlation
         # TODO: Generalize this for arbitrary number of correlations!        
-        if band_type == 'BB':
+        if band_type == 'BB' or band_type == 'EB':
             skip_first_band = 1
         elif band_type == 'EE':
             skip_first_band = 0  
@@ -376,7 +398,7 @@ def collect_outputs(root_path, path_out, band_type, correlation, slicing_points,
     for i in np.arange(low + 2, high + 1, 1):
         header += ', Band ' + str(i) 
     #print header
-    fname = path_out + 'percentages_of_convergence_' + correlation + '_' + band_type + '.dat'
+    fname = path_out + 'percentages_of_convergence_{:}_{:}.dat'.format(correlation, band_type)
     np.savetxt(fname, percent_convergence, header=header)
 
     # most important parameters:
@@ -446,7 +468,7 @@ def get_averages_and_errors(band_powers, inv_variances, variances_ext, convolved
     err_avg2 = np.zeros_like(band_mean)    
     conv_theo_avg = np.zeros_like(band_mean)    
     
-    if band_type == 'BB':
+    if band_type == 'BB' or band_type == 'EB':
         bands_to_plot = para.bands_to_plot[1:]
     else:
         bands_to_plot = para.bands_to_plot
@@ -543,7 +565,7 @@ def plot_band_powers_single(root_path, path_out, band_type, l, band_avg1, band_a
     
     #label_ext_cov = {'grfs': r'$GRF \ errors$', 'clones': r'$Clone \ errors$', 'stitched': r'$GRF \& Clone errors$'}
     
-    if band_type == 'BB':
+    if band_type == 'BB' or band_type == 'EB':
         bands_to_plot = para.bands_to_plot[1:]
     else:
         bands_to_plot = para.bands_to_plot
@@ -570,7 +592,7 @@ def plot_band_powers_single(root_path, path_out, band_type, l, band_avg1, band_a
     ax2 = ax1.twiny()
     # some additional labelling...
     fake_point = (1e-6, 1e-6)
-    if band_type in ['EE', 'BB']:
+    if band_type in ['EE', 'BB', 'EB']:
         if load_fail:
             title = r'$ \ z_{:}  \times \, z_{:}$'.format(index_zbin1, index_zbin2)
             ax1.text(.5 ,.9, title, horizontalalignment='center', transform=ax1.transAxes, fontsize=para.fontsize_legend)
@@ -710,7 +732,6 @@ def get_interpolated_theoretical_power_spectrum(path, ells, index_corr):
     
     return np.exp(D_ell(np.log(ells)))
 
-# TODO: Make this consistent again with new BWM dimensionality!!!
 def get_convolved_theory(path_to_bwm, path_to_theory, correlation, patch, band_offset, index_corr):
     # use \ell's of convolution matrix as nodes for interpolation! 
     
@@ -725,7 +746,11 @@ def get_convolved_theory(path_to_bwm, path_to_theory, correlation, patch, band_o
     D_ell = get_interpolated_theoretical_power_spectrum(path_to_theory, ells_sum, index_corr)
     
     # 4) load BWM:
-    convolution_matrix = np.load(path_to_bwm + 'band_window_matrix_sigma{:.2f}_'.format(para.sigma_int) + patch + '_nell{:}.npy'.format(para.ell_nodes))
+    # for backwards-compatibility:
+    try:
+        convolution_matrix = np.loadtxt(path_to_bwm + 'band_window_matrix_nell{:}.dat'.format(para.ell_nodes))
+    except:
+        convolution_matrix = np.load(path_to_bwm + 'band_window_matrix_sigma{:.2f}_{:}_nell{:}.npy'.format(para.sigma_int, patch, para.ell_nodes))
     
     # 5) slice matrix according to z-correlation:
     # NEW ORDERING DUE TO REVISED FISHER MATRICES!!!
@@ -885,7 +910,7 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
     
     colors = ['blue', 'orange', 'red']
     
-    if band_type == 'BB':
+    if band_type == 'BB' or band_type =='EB':
         bands_to_plot = para.bands_to_plot[1:]
     else:
         bands_to_plot = para.bands_to_plot
@@ -928,15 +953,15 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
         #ax[index_corr].scatter(100., 1e-5, marker='None', s=0., label=correlation_label[index_corr])
         
         # hide bands that are not used in grey area, but generally show them!
-        if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale): # or band_type == 'BB':
+        if not para.plot_on_linear_scale:
             y1 = [para.y_high, para.y_high]
             y2 = 0.
             norm = 1.
             ax[index_corr].fill_between([para.ell_low, exclude_low], y1, y2, interpolate=True, color='grey', alpha=0.3)
             ax[index_corr].fill_between([exclude_high, para.ell_high], y1, y2, interpolate=True, color='grey', alpha=0.3)
-        elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:            
+        else:            
             # empirical value:
-            scale = 1e+9 
+            scale = para.scale #1e+9 
             # here, we take out the \ell*(\ell+1)/2pi normalization of the band powers:
             norm = scale * 2. * np.pi / (ells[index_corr] * (ells[index_corr] + 1.))
             
@@ -956,66 +981,66 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
         wx = bands_max[index_corr]-bands_min[index_corr]
         if para.external_covariance and not para.fisher_errors:
             hy = 2. * err_avg1[index_corr]
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 bottom_value = np.abs(band_avg1[index_corr]) - err_avg1[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-            elif band_type == 'BB':
+                #ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+            else:
                 #bottom_value = -err_avg1[index_corr] #np.zeros_like(band_avg1[index_corr])#band_avg1[index_corr]-err_avg1[index_corr]
                 bottom_value = band_avg1[index_corr] - err_avg1[index_corr]                
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+            ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
         elif not para.external_covariance and para.fisher_errors:
             hy = 2. * err_avg2[index_corr]
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 bottom_value = np.abs(band_avg2[index_corr]) - err_avg2[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
-            elif band_type == 'BB':
+                #ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
+            else:
                 #bottom_value = -err_avg2[index_corr]#band_avg2[index_corr]-err_avg2[index_corr]
                 bottom_value = band_avg2[index_corr] - err_avg2[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
+            ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
         elif para.external_covariance and para.fisher_errors:
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 bottom_value1 = np.abs(band_avg1[index_corr]) - err_avg1[index_corr]
                 bottom_value2 = np.abs(band_avg2[index_corr]) - err_avg2[index_corr]
-                hy = 2. * err_avg1[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value1 * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                hy = 2. * err_avg2[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value2 * norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
-            elif band_type == 'BB':
+                #hy = 2. * err_avg1[index_corr]
+                #ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value1 * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                #hy = 2. * err_avg2[index_corr]
+                #ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value2 * norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
+            else:
                 #bottom_value1 = -err_avg1[index_corr]#band_avg1[index_corr]-err_avg1[index_corr]
                 #bottom_value2 = -err_avg2[index_corr]#band_avg2[index_corr]-err_avg2[index_corr]
                 bottom_value1 = band_avg1[index_corr] - err_avg1[index_corr]
                 bottom_value2 = band_avg2[index_corr] - err_avg2[index_corr]
-                hy = 2. * err_avg1[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value1 * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                hy = 2. * err_avg2[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value2 * norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
+            hy = 2. * err_avg1[index_corr]
+            ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value1 * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+            hy = 2. * err_avg2[index_corr]
+            ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value2 * norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
         # always plotted as dashed line!
         if para.run_to_run_errors:
             hy = 2. * err_run_to_run[index_corr]
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 bottom_value = np.abs(band_mean[index_corr]) - err_run_to_run[index_corr]
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-            elif band_type == 'BB':
+                #ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+            else:
                 #bottom_value = -err_avg1[index_corr] #np.zeros_like(band_avg1[index_corr])#band_avg1[index_corr]-err_avg1[index_corr]
                 bottom_value = band_mean[index_corr] - err_run_to_run[index_corr]                
-                ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+            ax[index_corr].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
         
         if para.external_covariance and not para.fisher_errors:
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 ax[index_corr].scatter(ells[index_corr], band_avg1[index_corr] * norm, s=para.sp, color='black', marker='o')
                 mask = np.sign(band_avg1[index_corr]) < 0.
                 ax[index_corr].scatter(ells[index_corr][mask], np.abs(band_avg1[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
             else:
                 ax[index_corr].scatter(ells[index_corr], band_avg1[index_corr] * norm, s=para.sp, color='black', marker='o')
         elif not para.external_covariance and para.fisher_errors:
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 ax[index_corr].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='o')
                 mask = np.sign(band_avg2[index_corr]) < 0.
                 ax[index_corr].scatter(ells[index_corr][mask], np.abs(band_avg2[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
             else:
                 ax[index_corr].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='o')
         elif para.external_covariance and para.fisher_errors:
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 ax[index_corr].scatter(ells[index_corr], band_avg1[index_corr] * norm, s=para.sp, color='black', marker='o')
                 ax[index_corr].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='^')
                 mask = np.sign(band_avg1[index_corr]) < 0.
@@ -1027,7 +1052,7 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
                 ax[index_corr].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='^')
         
         if para.run_to_run_errors:
-            if band_type == 'EE': # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 ax[index_corr].scatter(ells[index_corr], band_mean[index_corr] * norm, s=para.sp, color='black', marker='*')
                 mask = np.sign(band_avg1[index_corr]) < 0.
                 ax[index_corr].scatter(ells[index_corr][mask], np.abs(band_mean[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='*')
@@ -1035,7 +1060,7 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
                 ax[index_corr].scatter(ells[index_corr], band_mean[index_corr] * norm, s=para.sp, color='black', marker='*')
         
         # comparison with theoretical predictions:
-        if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale):
+        if not para.plot_on_linear_scale:
             if para.plot_theory:
                 for index_theo, path in enumerate(para.path_to_theory):
                     ell_theo, D_ell_lcdm = get_theoretical_power_spectrum(path, index_corr)
@@ -1049,7 +1074,7 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
                 mask = np.sign(conv_theo_avg[index_corr]) < 0.
                 ax[index_corr].scatter(ells[index_corr], conv_theo_avg[index_corr], color='red', marker='o', s=30, lw=2, label=r'$\mathcal{B}_\alpha^{theo} = \sum_\ell W_{\alpha \ell} D_\ell^{theo}$')
                 ax[index_corr].scatter(ells[index_corr][mask], np.abs(conv_theo_avg[index_corr][mask]), edgecolor='red', facecolors='None', marker='o', s=50, lw=2)
-        elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+        else:
             if para.plot_theory:
                 for index_theo, path in enumerate(para.path_to_theory):
                     ell_theo, D_ell_lcdm = get_theoretical_power_spectrum(path, index_corr)
@@ -1069,18 +1094,18 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
             print shot_noise
             if nzbins > 1:
                 print 'Shot noise = {:.3e}'.format(shot_noise[index_lin])
-                if para.plot_B_modes_on_linear_scale and band_type == 'BB':
+                if para.plot_on_linear_scale:
                     inv_norm = 2. * np.pi / (ells_noise * (ells_noise + 1.))
                     p_noise[index_lin] *= inv_norm * scale
                 ax[index_corr].plot(ells_noise, p_noise[index_lin], ls='--', dashes=(2, 2), color='grey', label=r'$C^\mathrm{noise}$')
             else:
                 print 'Shot noise = {:.3e}'.format(float(shot_noise))
-                if para.plot_B_modes_on_linear_scale and band_type == 'BB':
+                if para.plot_on_linear_scale:
                     inv_norm = 2. * np.pi / (ells_noise * (ells_noise + 1.))
                     p_noise *= inv_norm * scale
                 ax[index_corr].plot(ells_noise, p_noise, ls='--', dashes=(2, 2), color='grey', label=r'$C^\mathrm{noise}$')
         
-        if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale): # or band_type == 'BB':
+        if not para.plot_on_linear_scale:
             ax[index_corr].set_yscale('log', nonposy='clip')
             ax[index_corr].set_ylim([para.y_low, para.y_high])
             
@@ -1091,7 +1116,7 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
             ax[index_corr].text(.5, .6, correlation_labels[index_corr], horizontalalignment='center', transform=ax[index_corr].transAxes)
             ax[index_corr].tick_params(axis='both', labelsize=para.fontsize_ticks)
         
-        elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+        else:
             ax[index_corr].text(.54,.1, correlation_labels[index_corr], horizontalalignment='center', transform=ax[index_corr].transAxes)
             ax[index_corr].set_xlabel(r'$\ell$', fontsize=para.fontsize_label)
             ax[index_corr].axhline(0., ls='--', color='black')
@@ -1103,22 +1128,30 @@ def plot_band_powers_for_paper(path_out, ells, band_avg1, band_avg2, band_mean, 
     if band_type == 'EE': # or band_type == 'BB':
         ax[0].set_ylabel(r'$\ell(\ell+1)C^{\mathrm{EE}}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
         ax[0].legend(loc='upper center', fontsize=para.fontsize_legend, frameon=False)#, title=correlation_label[index_corr])
-    elif band_type == 'BB' and not para.plot_B_modes_on_linear_scale:
+    elif band_type == 'BB' and not para.plot_on_linear_scale:
         ax[0].set_ylabel(r'$\ell(\ell+1)C^{\mathrm{BB}}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
         ax[0].legend(loc='upper center', fontsize=para.fontsize_legend, frameon=False)
-    elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+    elif band_type == 'EB' and not para.plot_on_linear_scale:
+        ax[0].set_ylabel(r'$\ell(\ell+1)C^{\mathrm{EB}}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
+        ax[0].legend(loc='upper center', fontsize=para.fontsize_legend, frameon=False)
+    elif band_type == 'BB' and para.plot_on_linear_scale:
         # TODO: Make sure that number in brackets corresponds to value of variable "scale"
         ax[0].set_ylabel(r'$C^{\mathrm{BB}}(\ell)$' + r'$ \ (\times 10^{:})$'.format(int(np.log10(scale))), fontsize=para.fontsize_label)
         ax[0].legend(loc='best', fontsize=para.fontsize_legend, frameon=False)
+    elif band_type == 'EB' and para.plot_on_linear_scale:
+        # TODO: Make sure that number in brackets corresponds to value of variable "scale"
+        ax[0].set_ylabel(r'$C^{\mathrm{EB}}(\ell)$' + r'$ \ (\times 10^{:})$'.format(int(np.log10(scale))), fontsize=para.fontsize_label)
+        ax[0].legend(loc='best', fontsize=para.fontsize_legend, frameon=False)
+    
     fig.tight_layout(w_pad=0., h_pad=0.)
     fig.subplots_adjust(wspace=0., hspace=0.)
     #fig.tight_layout(w_pad=0., h_pad=0.)
     
     for filetype in para.file_types:
         if len(para.patches) > 1:
-            fname = path_out+'/plots/all_signals_'+band_type+'.'+filetype
+            fname = path_out + '/plots/all_signals_' + band_type + '.' + filetype
         else:
-            fname = path_out+'/plots/all_signals_'+band_type+'_'+para.patches[0]+'.'+filetype
+            fname = path_out + '/plots/all_signals_' + band_type + '_' + para.patches[0] + '.' + filetype
         if filetype == 'png' and para.transparent_background:
             fig.savefig(fname, dpi=450, transparent=True)
         else:
@@ -1152,7 +1185,7 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
             else:
                 colors.append('grey')
     
-    if band_type == 'BB':
+    if band_type == 'BB' or band_type == 'EB':
         bands_to_plot = para.bands_to_plot[1:]
     else:
         bands_to_plot = para.bands_to_plot
@@ -1198,15 +1231,15 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
             print band_avg1[index_corr]
         
             # hide bands that are not used in grey area, but generally show them!
-            if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale): # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 y1 = [para.y_high, para.y_high]
                 y2 = 0.
                 norm = 1.
                 ax[index_zbin1, index_zbin2].fill_between([para.ell_low, exclude_low], y1, y2, interpolate=True, color='grey', alpha=0.3)
                 ax[index_zbin1, index_zbin2].fill_between([exclude_high, para.ell_high], y1, y2, interpolate=True, color='grey', alpha=0.3)
-            elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+            else:
                 # empirical value:
-                scale = 1e+9 
+                scale = para.scale #1e+9 
                 # here, we take out the \ell*(\ell+1)/2pi normalization of the band powers:
                 norm = scale * 2. * np.pi / (ells[index_corr] * (ells[index_corr] + 1.))
             
@@ -1222,86 +1255,87 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
             wx = bands_max[index_corr]-bands_min[index_corr]
             if para.external_covariance and not para.fisher_errors:
                 hy = 2. * err_avg1[index_corr]
-                if band_type == 'EE': # or band_type == 'BB':
-                    bottom_value = np.abs(band_avg1[index_corr])-err_avg1[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                elif band_type == 'BB':
+                if not para.plot_on_linear_scales:
+                    bottom_value = np.abs(band_avg1[index_corr]) - err_avg1[index_corr]
+                    #ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                else:
                     #bottom_value = -err_avg1[index_corr] #np.zeros_like(band_avg1[index_corr])#band_avg1[index_corr]-err_avg1[index_corr]
-                    bottom_value = band_avg1[index_corr]-err_avg1[index_corr]                
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                    bottom_value = band_avg1[index_corr] - err_avg1[index_corr]                
+                ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
             elif not para.external_covariance and para.fisher_errors:
                 hy = 2. * err_avg2[index_corr]
-                if band_type == 'EE': # or band_type == 'BB':
-                    bottom_value = np.abs(band_avg2[index_corr])-err_avg2[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
-                elif band_type == 'BB':
+                if not para.plot_on_linear_scales:
+                    bottom_value = np.abs(band_avg2[index_corr]) - err_avg2[index_corr]
+                    #ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
+                else:
                     #bottom_value = -err_avg2[index_corr]#band_avg2[index_corr]-err_avg2[index_corr]
                     bottom_value = band_avg2[index_corr]-err_avg2[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
+                ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None) #r'$Fisher \ errors$')
             elif para.external_covariance and para.fisher_errors:
-                if band_type == 'EE': # or band_type == 'BB':
-                    bottom_value1 = np.abs(band_avg1[index_corr])-err_avg1[index_corr]
-                    bottom_value2 = np.abs(band_avg2[index_corr])-err_avg2[index_corr]
-                    hy = 2. * err_avg1[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value1*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                    hy = 2. * err_avg2[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value2*norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
-                elif band_type == 'BB':
+                if not para.plot_on_linear_scales:
+                    bottom_value1 = np.abs(band_avg1[index_corr]) - err_avg1[index_corr]
+                    bottom_value2 = np.abs(band_avg2[index_corr]) - err_avg2[index_corr]
+                    #hy = 2. * err_avg1[index_corr]
+                    #ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value1*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                    #hy = 2. * err_avg2[index_corr]
+                    #ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value2*norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
+                else:
                     #bottom_value1 = -err_avg1[index_corr]#band_avg1[index_corr]-err_avg1[index_corr]
                     #bottom_value2 = -err_avg2[index_corr]#band_avg2[index_corr]-err_avg2[index_corr]
-                    bottom_value1 = band_avg1[index_corr]-err_avg1[index_corr]
-                    bottom_value2 = band_avg2[index_corr]-err_avg2[index_corr]
-                    hy = 2. * err_avg1[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value1*norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                    hy = 2. * err_avg2[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value2*norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
+                    bottom_value1 = band_avg1[index_corr] - err_avg1[index_corr]
+                    bottom_value2 = band_avg2[index_corr] - err_avg2[index_corr]
+                hy = 2. * err_avg1[index_corr]
+                ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy * norm, bottom=bottom_value1 * norm, width=wx, align='edge', facecolor=colors[index_corr], edgecolor='None', alpha=0.5, label=None)#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                hy = 2. * err_avg2[index_corr]
+                ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy * norm, bottom=bottom_value2 * norm, width=wx, align='edge', color='None', label=r'$Fisher \ errors$', linewidth=2, ls='dashed')
             # always plotted with dashed line:
             if para.run_to_run_errors:
                 hy = 2. * err_run_to_run[index_corr]
-                if band_type == 'EE': # or band_type == 'BB':
-                    bottom_value = np.abs(band_mean[index_corr])-err_run_to_run[index_corr]
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
-                elif band_type == 'BB':
+                if not para.plot_on_linear_scales:
+                    bottom_value = np.abs(band_mean[index_corr]) - err_run_to_run[index_corr]
+                    #ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                else:
                     #bottom_value = -err_avg1[index_corr] #np.zeros_like(band_avg1[index_corr])#band_avg1[index_corr]-err_avg1[index_corr]
-                    bottom_value = band_mean[index_corr]-err_run_to_run[index_corr]                
-                    ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy*norm, bottom=bottom_value*norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
+                    bottom_value = band_mean[index_corr] - err_run_to_run[index_corr]                
+                ax[index_zbin1, index_zbin2].bar(bands_min[index_corr], hy * norm, bottom=bottom_value * norm, width=wx, align='edge', color='None', label=r'$\mathrm{run-to-run \ errors}$', linewidth=2, ls='dashed')#label_ext_cov[para.type_ext_cov], alpha=0.5,)
                 
             if para.external_covariance and not para.fisher_errors:
-                if band_type == 'EE': # or band_type == 'BB':
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr]*norm, s=para.sp, color='black', marker='o')
+                
+                ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr] * norm, s=para.sp, color='black', marker='o')
+                
+                if not para.plot_on_linear_scales:
                     mask = np.sign(band_avg1[index_corr]) < 0.
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg1[index_corr][mask])*norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
-                else:
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr]*norm, s=para.sp, color='black', marker='o')
+                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg1[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
+                
             elif not para.external_covariance and para.fisher_errors:
-                if band_type == 'EE': # or band_type == 'BB':
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr]*norm, s=para.sp, color='black', marker='o')
+                
+                ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='o')
+                    
+                if not para.plot_on_linear_scales:
                     mask = np.sign(band_avg2[index_corr]) < 0.
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg2[index_corr][mask])*norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
-                else:
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr]*norm, s=para.sp, color='black', marker='o')
-            elif para.external_covariance and para.fisher_errors:
-                if band_type == 'EE': # or band_type == 'BB':
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr]*norm, s=para.sp, color='black', marker='o')
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr]*norm, s=para.sp, color='black', marker='^')
-                    mask = np.sign(band_avg1[index_corr]) < 0.
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg1[index_corr][mask])*norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
-                    mask = np.sign(band_avg2[index_corr]) < 0.
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg2[index_corr][mask])*norm, s=para.sp, edgecolor='black', facecolors='None', marker='^')
-                else:
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr]*norm, s=para.sp, color='black', marker='o')
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr]*norm, s=para.sp, color='black', marker='^')
+                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg2[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
             
+            elif para.external_covariance and para.fisher_errors:
+                
+                ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg1[index_corr] * norm, s=para.sp, color='black', marker='o')
+                ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_avg2[index_corr] * norm, s=para.sp, color='black', marker='^')
+                    
+                if not para.plot_on_linear_scales:
+                    mask = np.sign(band_avg1[index_corr]) < 0.
+                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg1[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='o')
+                    mask = np.sign(band_avg2[index_corr]) < 0.
+                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_avg2[index_corr][mask]) * norm, s=para.sp, edgecolor='black', facecolors='None', marker='^')
+                
             if para.run_to_run_errors:
-                if band_type == 'EE': # or band_type == 'BB':
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_mean[index_corr]*norm, s=para.sp, color='black', marker='*')
+                
+                ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_mean[index_corr]*norm, s=para.sp, color='black', marker='*')
+                                    
+                if not para.plot_on_linear_scales:
                     mask = np.sign(band_avg1[index_corr]) < 0.
                     ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(band_mean[index_corr][mask])*norm, s=para.sp, edgecolor='black', facecolors='None', marker='*')
-                else:
-                    ax[index_zbin1, index_zbin2].scatter(ells[index_corr], band_mean[index_corr]*norm, s=para.sp, color='black', marker='*')
-            
+                
             # comparison with theoretical predictions:
-            if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale):
+            if not para.plot_on_linear_scale:
                 if para.plot_theory:
                     for index_theo, path in enumerate(para.path_to_theory):
                         ell_theo, D_ell_lcdm = get_theoretical_power_spectrum(path, index_corr)
@@ -1310,14 +1344,14 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
                     mask = np.sign(conv_theo_avg[index_corr]) < 0.
                     ax[index_zbin1, index_zbin2].scatter(ells[index_corr], conv_theo_avg[index_corr], color='red', marker='o', s=30, lw=2, label=r'$\mathcal{B}_\alpha^{theo} = \sum_\ell W_{\alpha \ell} D_\ell^{theo}$')
                     ax[index_zbin1, index_zbin2].scatter(ells[index_corr][mask], np.abs(conv_theo_avg[index_corr][mask]), edgecolor='red', facecolors='None', marker='o', s=50, lw=2)
-            elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+            else:
                 if para.plot_theory:
                     for index_theo, path in enumerate(para.path_to_theory):
                         ell_theo, D_ell_lcdm = get_theoretical_power_spectrum(path, index_corr)
                         inv_norm = 2. * np.pi / (ell_theo * (ell_theo + 1))                
                         ax[index_zbin1, index_zbin2].plot(ell_theo, D_ell_lcdm * inv_norm * scale, color=para.color_theory[index_theo], ls=para.ls_theory[index_theo], lw=para.lw_theory[index_theo], label=para.label_theory[index_theo])
         
-            if (band_type == 'EE') or (band_type == 'BB' and not para.plot_B_modes_on_linear_scale): # or band_type == 'BB':
+            if not para.plot_on_linear_scale:
                 ax[index_zbin1, index_zbin2].set_yscale('log', nonposy='clip')
                 ax[index_zbin1, index_zbin2].set_ylim([para.y_low, para.y_high])
             
@@ -1328,7 +1362,7 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
                 ax[index_zbin1, index_zbin2].text(.54, .7, correlation_labels[index_corr], horizontalalignment='center', transform=ax[index_zbin1, index_zbin2].transAxes)
                 ax[index_zbin1, index_zbin2].tick_params(axis='both', labelsize=para.fontsize_ticks)
         
-            elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
+            else:
                 ax[index_zbin1, index_zbin2].text(.54,.1, correlation_labels[index_corr], horizontalalignment='center', transform=ax[index_zbin1, index_zbin2].transAxes)
                 ax[index_zbin1, index_zbin2].set_xlabel(r'$\ell$', fontsize=para.fontsize_label)
                 ax[index_zbin1, index_zbin2].axhline(0., ls='--', color='black')
@@ -1339,7 +1373,7 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
             
             if para.plot_noise_power and index_zbin1 == index_zbin2:
                 ells_noise, p_noise, shot_noise, n_eff = get_shot_noise(para.ell_low, para.ell_high, nzbins=nzbins)
-                if para.plot_B_modes_on_linear_scale and band_type == 'BB':
+                if para.plot_on_linear_scale:
                     inv_norm = 2. * np.pi / (ells_noise * (ells_noise + 1.))
                     p_noise *= inv_norm * scale
                 print ells_noise.shape, p_noise.shape, shot_noise.shape, n_eff.shape
@@ -1363,19 +1397,27 @@ def plot_band_powers_for_paper_triangle(path_out, ells, band_avg1, band_avg2, ba
             
             index_corr += 1
     
-    if band_type == 'EE': # or band_type == 'BB':
+    if band_type == 'EE':
         for index_zbin in xrange(nzbins):        
             ax[index_zbin, 0].set_ylabel(r'$\ell(\ell+1)C^\mathrm{EE}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
         ax[1, 1].legend(loc=(1, 1), fontsize=para.fontsize_legend, frameon=False)
-    elif band_type == 'BB' and not para.plot_B_modes_on_linear_scale:
+    elif band_type == 'BB' and not para.plot_on_linear_scale:
         for index_zbin in xrange(nzbins):        
             ax[index_zbin, 0].set_ylabel(r'$\ell(\ell+1)C^\mathrm{BB}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
         ax[0, 0].legend(loc='upper center', fontsize=para.fontsize_legend, frameon=False)
-    elif band_type == 'BB' and para.plot_B_modes_on_linear_scale:
-        # TODO: Make sure that number in brackets corresponds to value of variable "scale"
+    elif band_type == 'EB' and not para.plot_on_linear_scale:
+        for index_zbin in xrange(nzbins):        
+            ax[index_zbin, 0].set_ylabel(r'$\ell(\ell+1)C^\mathrm{EB}(\ell)/2\mathrm{\pi}$', fontsize=para.fontsize_label)
+        ax[0, 0].legend(loc='upper center', fontsize=para.fontsize_legend, frameon=False)
+    elif band_type == 'BB' and para.plot_on_linear_scale:
         for index_zbin in xrange(nzbins):        
             ax[index_zbin, 0].set_ylabel(r'$C^\mathrm{BB}(\ell)$' + r'$ \ (\times 10^{:})$'.format(int(np.log10(scale))), fontsize=para.fontsize_label)
         ax[0, 0].legend(loc='best', fontsize=para.fontsize_legend, frameon=False)
+    elif band_type == 'EB' and para.plot_on_linear_scale:
+        for index_zbin in xrange(nzbins):        
+            ax[index_zbin, 0].set_ylabel(r'$C^\mathrm{EB}(\ell)$' + r'$ \ (\times 10^{:})$'.format(int(np.log10(scale))), fontsize=para.fontsize_label)
+        ax[0, 0].legend(loc='best', fontsize=para.fontsize_legend, frameon=False)
+    
     fig.tight_layout(w_pad=0., h_pad=0.)
     fig.subplots_adjust(wspace=0., hspace=0.)
     #fig.tight_layout(w_pad=0., h_pad=0.)
@@ -1440,11 +1482,15 @@ if __name__ == '__main__':
             nbands = len(para.bands_to_plot)
         elif 'BB' in para.band_types:
             nbands = len(para.bands_to_plot) - 1
-        elif 'EE' in para.band_types and 'BB' in para.band_types:
-            print 'Script must be run for either EE or BB!'
+        elif 'EB' in para.band_types:
+            nbands = len(para.bands_to_plot) - 1
+        elif 'EE' in para.band_types and 'BB' in para.band_types or \
+             'EE' in para.band_types and 'EB' in para.band_types or \
+             'BB' in para.band_types and 'EB' in para.band_types:
+            print 'Script must be run for either EE or BB or EB!'
             exit()
         else:
-            print 'Script must be run for either EE or BB!'
+            print 'Script must be run for either EE or BB or EB!'
             exit()
         fname = para.file_for_multiplicative_bias_correction
         if nzbins == 1:
@@ -1529,6 +1575,16 @@ if __name__ == '__main__':
     collect_all_bands_min_BB = []
     collect_all_bands_max_BB = []
     collect_all_ells_BB = []
+    
+    collect_all_bp_avg1_EB = []
+    collect_all_bp_avg2_EB = []
+    collect_all_bp_mean_EB = []    
+    collect_all_err_avg1_EB = []
+    collect_all_err_avg2_EB = []
+    collect_all_err_run_to_run_EB = []    
+    collect_all_bands_min_EB = []
+    collect_all_bands_max_EB = []
+    collect_all_ells_EB = []
                         
     for index_corr, correlation in enumerate(correlations):
         for band_type in para.band_types:
@@ -1554,10 +1610,19 @@ if __name__ == '__main__':
                 
             # correct spectra for excess noise:
             if para.correct_for_excess_noise:
-                fname = para.path_to_excess_noise + '{:}zbins/all_estimates_band_powers_excess_noise_'.format(nzbins) + band_type + '_' + correlation + '.dat' 
-                excess_noise = np.loadtxt(fname)
-                fname = para.path_to_excess_noise + '{:}zbins/errors_excess_noise_'.format(nzbins) + band_type + '_' + correlation + '.dat' 
-                err_excess_noise = np.loadtxt(fname)
+                fname = para.path_to_excess_noise + '{:}zbins/all_estimates_band_powers_excess_noise_{:}_{:}'.format(nzbins, band_type, correlation)
+                # for backwards-compatibility:
+                try:
+                    excess_noise = np.loadtxt(fname + '.dat')
+                except:
+                    excess_noise = np.load(fname + '.npy')
+                    
+                fname = para.path_to_excess_noise + '{:}zbins/errors_excess_noise_{:}_{:}'.format(nzbins, band_type, correlation)
+                # for backwards-compatibility:
+                try:
+                    err_excess_noise = np.loadtxt(fname + '.dat')
+                except:
+                    err_excess_noise = np.load(fname + '.npy')
                 # signs for excess noise are derived for THEORY spectrum, so signs need to be flipped (i.e. subtracted)!
                 band_avg1 -= excess_noise
                 band_avg2 -= excess_noise
@@ -1585,10 +1650,18 @@ if __name__ == '__main__':
             elif band_type == 'BB':   
                 if para.subtract_fiducial_B_modes:
                     #TODO: filename here is hardcoded!
-                    fname = para.path_to_fiducial_B_modes + '{:}zbins/all_estimates_band_powers_fiducial_BB_'.format(nzbins) + correlation + '.dat' 
-                    fiducial_B_modes = np.loadtxt(fname)
-                    fname = para.path_to_fiducial_B_modes + '{:}zbins/errors_fiducial_BB_'.format(nzbins) + correlation + '.dat' 
-                    err_fiducial_B_modes = np.loadtxt(fname)
+                    fname = para.path_to_fiducial_B_modes + '{:}zbins/all_estimates_band_powers_fiducial_BB_{:}'.format(nzbins, correlation)
+                    # for backwards-compatibility:
+                    try:
+                        fiducial_B_modes = np.loadtxt(fname + '.dat')
+                    except:
+                        fiducial_B_modes = np.load(fname + '.npy')
+                    fname = para.path_to_fiducial_B_modes + '{:}zbins/errors_fiducial_BB_{:}'.format(nzbins, correlation)
+                    # for backwards-compatibility:
+                    try:
+                        err_fiducial_B_modes = np.loadtxt(fname + '.dat')
+                    except:
+                        err_fiducial_B_modes = np.load(fname + '.npy')
                     band_avg1 -= fiducial_B_modes
                     band_avg2 -= fiducial_B_modes
                     #print band_mean, fiducial_B_modes
@@ -1610,10 +1683,21 @@ if __name__ == '__main__':
                 # only needed for consistency...
                 collect_conv_theo_avg.append(conv_theo_avg)
                 collect_all_ells_BB.append(ells)
-                
+            elif band_type == 'EB':
+                collect_all_bp_avg1_EB.append(band_avg1)
+                collect_all_bp_avg2_EB.append(band_avg2)
+                collect_all_bp_mean_EB.append(band_mean)
+                collect_all_err_avg1_EB.append(err_avg1)
+                collect_all_err_avg2_EB.append(err_avg2)
+                collect_all_err_run_to_run_EB.append(err_run_to_run)                
+                collect_all_bands_min_EB.append(bands_min)
+                collect_all_bands_max_EB.append(bands_max)
+                # only needed for consistency...
+                collect_conv_theo_avg.append(conv_theo_avg)
+                collect_all_ells_EB.append(ells)
             # save some plotting data:
             # I should also save bands_min and bands_max for box plots... from future import...
-            fname = path_out + 'data_for_plots_sigma{:.2f}_'.format(para.sigma_int) + '{:}fields_'.format(len(para.patches)) + band_type + '_' + correlation + '.dat'
+            fname = path_out + 'data_for_plots_sigma{:.2f}_{:}fields_{:}_{:}'.format(para.sigma_int, len(para.patches), band_type, correlation)
             header = 'ells, ells_min, ells_max, band_avg1, band_avg2, band_mean, err_avg1, err_avg2, std / sqrt_N'
             savedata = np.column_stack((ells, bands_min, bands_max, band_avg1, band_avg2, band_mean, err_avg1, err_avg2, err_run_to_run))
             np.savetxt(fname, savedata, header=header)
@@ -1637,4 +1721,9 @@ if __name__ == '__main__':
                 plot_band_powers_for_paper(path_out, collect_all_ells_BB, collect_all_bp_avg1_BB, collect_all_bp_avg2_BB, collect_all_bp_mean_BB, collect_all_err_avg1_BB, collect_all_err_avg2_BB, collect_all_err_run_to_run_BB, collect_conv_theo_avg, collect_all_bands_min_BB, collect_all_bands_max_BB, correlations, correlation_labels, nzbins, band_type='BB')
             else:
                 plot_band_powers_for_paper_triangle(path_out, collect_all_ells_BB, collect_all_bp_avg1_BB, collect_all_bp_avg2_BB, collect_all_bp_mean_BB, collect_all_err_avg1_BB, collect_all_err_avg2_BB, collect_all_err_run_to_run_BB, collect_conv_theo_avg, collect_all_bands_min_BB, collect_all_bands_max_BB, nzbins, correlation_labels, band_type='BB')
+        if 'EB' in para.band_types:
+            if nzcorrs <= 3:
+                plot_band_powers_for_paper(path_out, collect_all_ells_EB, collect_all_bp_avg1_EB, collect_all_bp_avg2_EB, collect_all_bp_mean_EB, collect_all_err_avg1_EB, collect_all_err_avg2_EB, collect_all_err_run_to_run_EB, collect_conv_theo_avg, collect_all_bands_min_EB, collect_all_bands_max_EB, correlations, correlation_labels, nzbins, band_type='EB')
+            else:
+                plot_band_powers_for_paper_triangle(path_out, collect_all_ells_EB, collect_all_bp_avg1_EB, collect_all_bp_avg2_EB, collect_all_bp_mean_EB, collect_all_err_avg1_EB, collect_all_err_avg2_EB, collect_all_err_run_to_run_EB, collect_conv_theo_avg, collect_all_bands_min_EB, collect_all_bands_max_EB, nzbins, correlation_labels, band_type='EB')    
     print 'Done.'

@@ -22,9 +22,11 @@ band_types = ['EE']
 #band_types = ['BB']
 #band_types = ['EB']
 
-# if B-modes should be plotted on linear scale:
-plot_B_modes_on_linear_scale = True
-
+# if BB/EB-modes should be plotted on linear scale:
+plot_on_linear_scale = True
+# if plotting on linear scale, you might want to supply a sclae to be divided out:
+scale = 1e+9
+ 
 # if fiducial B-modes should be subtracted off the signal:
 subtract_fiducial_B_modes = False
 # set to "True" if errors should be propagated into plot:
