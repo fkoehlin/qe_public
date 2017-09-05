@@ -1,4 +1,4 @@
-This repository contains code for a quadratic estimator algorithm in order to estimate the weak gravitational lensing shear power spectrum in multipole band powers and in tomographic bins (i.e. redshift slices along the line-of-sight). The algorithm was proposed in [Hu & White 2001 (ApJ, 554, 67)](http://adsabs.harvard.edu/abs/2001ApJ...554...67H), further described in [Lin et al. 2012 (ApJ, 761, 15)](http://adsabs.harvard.edu/abs/2012ApJ...761...15L) and it was expanded in [Koehlinger et al. 2016 (MNRAS, 456, 1508)](http://adsabs.harvard.edu/abs/2016MNRAS.456.1508K) to allow for a tomographic analysis, including its application to shear catalogues from CFHTLenS. Most recently it was used in [Koehlinger et al. 2017 (MNRAS, 471, 4412)](http://adsabs.harvard.edu/abs/2017MNRAS.471.4412K) on shear catalogues from KiDS-450. 
+This repository contains code for a quadratic estimator algorithm in order to estimate the weak gravitational lensing shear power spectrum in multipole band powers and in tomographic bins (i.e. redshift slices along the line-of-sight). The algorithm was proposed in [Hu & White 2001 (ApJ, 554, 67)](http://adsabs.harvard.edu/abs/2001ApJ...554...67H), further described in [Lin et al. 2012 (ApJ, 761, 15)](http://adsabs.harvard.edu/abs/2012ApJ...761...15L) and it was expanded in [Köhlinger et al. 2016 (MNRAS, 456, 1508)](http://adsabs.harvard.edu/abs/2016MNRAS.456.1508K) to allow for a tomographic analysis, including its application to shear catalogues from CFHTLenS. Most recently it was used in [Köhlinger et al. 2017 (MNRAS, 471, 4412)](http://adsabs.harvard.edu/abs/2017MNRAS.471.4412K) on shear catalogues from KiDS-450. 
 
 The last two papers also include a self-consistent description of the algorithm. Please cite them if results based on this code are published! 
 
@@ -41,4 +41,3 @@ Last but not least you might want to play around with some real data, hence here
 
 * CFHTLenS: http://www.cfhtlens.org/astronomers/data-store
 * KiDS-450: http://kids.strw.leidenuniv.nl/sciencedata.php
-
