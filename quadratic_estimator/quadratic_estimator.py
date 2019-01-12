@@ -927,17 +927,6 @@ if __name__ == '__main__':
                 print 'Either sigma_int or sigma_int_e1 and sigma_int_e2 must be supplied in input-file!'
                 exit()
 
-    if ini.sigma_int_e1 != None and ini.sigma_int_e2 != None:
-        # this is the definition of root-mean-square, rms:
-        sigma_int = np.sqrt((np.asarray(ini.sigma_int_e1)**2 + np.asarray(ini.sigma_int_e2)**2) / 2.)
-        print 'Symmetrizing sigma_int_e1 and sigma_int_e2 to sigma_int.'
-    elif sigma_int != None:
-        sigma_int = np.asarray(ini.sigma_int)
-        print 'Using supplied sigma_int.'
-    elif sigma_int in ['estimated', 'estimate', 'est']:
-        print 'Sigma_int will be estimated from data.'
-        sigma_int = np.ones(nzbins) * -1.
-
     # this is just for naming purposes:
     if ini.estimate_sigma_int:
         sigma_int_for_naming = 'sigma_int_est'
