@@ -1001,6 +1001,13 @@ if __name__ == '__main__':
                                                                       nzbins=nzbins, mode=ini.mode, min_num_elements_pix=ini.minimal_number_elements_per_pixel, column_names=column_names)
     print 'Time for data reduction: {:.4f}s'.format(timer() - t0_data)
     print 'Sigma_int (per z-bin): \n', sigma_int
+    header = ''
+    for index_zbin in xrange(nzbins):
+        header += 'z-bin{:}, '.format(index_zbin + 1)
+    header = header[:-2]
+    fname = path_output + 'sigma_int_estimated.txt'
+    np.savetxt(fname, np.column_stack(sigma_int), header=header)
+    print 'Saved sigma_int to: \n', fname
 
     # sanity check for that coordinates are the same...:
     # What if not?!

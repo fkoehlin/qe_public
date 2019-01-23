@@ -338,10 +338,11 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
     # second loop is really for data reduction:
     g1_all_zbins = []
     g2_all_zbins = []
-    e1_all_zbins = []
-    e2_all_zbins = []
-    weights_all_zbins = []
+    e1_avg_prep_all_zbins = []
+    e2_avg_prep_all_zbins = []
+    sum_weights_all_zbins = []
     N_eff_all_zbins = []
+    sigma_int_est_sqr_naive_all = []
     #shot_noise_all_zbins = []
     x_all_zbins = []
     y_all_zbins = []
@@ -357,7 +358,7 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
         tbdata = table[1].data
         cols = table[1].columns
         # in order to do things correctly, I should return data unmasked and combine the masks here...
-        g1, g2, e1, e2, weights, N_eff, sigma, field_properties, x, y, mask = reduce_data(tbdata, cols, x_coords[index_zbin], y_coords[index_zbin], xmin, xmax, ymin, ymax, identifier=identifier, pixel_scale=pixel_scale, fname_control=fname_binned, min_num_elements_pix=min_num_elements_pix, index_zbin=index_zbin, column_names=column_names)
+        g1, g2, e1_avg_prep, e2_avg_prep, e1_var_prep, e2_var_prep, sum_weight, sigma_int_est_sqr_naive, N_eff, field_properties, x, y, mask = reduce_data(tbdata, cols, x_coords[index_zbin], y_coords[index_zbin], xmin, xmax, ymin, ymax, identifier=identifier, pixel_scale=pixel_scale, fname_control=fname_binned, min_num_elements_pix=min_num_elements_pix, index_zbin=index_zbin, e1_est_avg=0., e2_est_avg=0., column_names=column_names)
 
         # pass tangent point to dictionary
         field_properties['Tangent_point'] = tangent_points[index_zbin]
@@ -365,10 +366,11 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
         # collect them all:
         g1_all_zbins.append(g1)
         g2_all_zbins.append(g2)
-        e1_all_zbins.append(e1)
-        e2_all_zbins.append(e2)
+        e1_avg_prep_all_zbins.append(e1_avg_prep)
+        e2_avg_prep_all_zbins.append(e2_avg_prep)
         #shot_noise_all_zbins.append(shot_noise)
-        weights_all_zbins.append(weights)
+        sum_weights_all_zbins.append(sum_weight)
+        sigma_int_est_sqr_naive_all.append(sigma_int_est_sqr_naive)
         N_eff_all_zbins.append(N_eff)
         x_all_zbins.append(x)
         y_all_zbins.append(y)
@@ -386,15 +388,39 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
     shot_noise_masked = []
     #sigma_all_zbins = []
     for index_zbin in xrange(nzbins):
+
         # shear = (g11, ..., g1n, g21, ..., g2n)
         data_masked.append(np.concatenate((g1_all_zbins[index_zbin][maximal_mask.flatten()], g2_all_zbins[index_zbin][maximal_mask.flatten()])))
         x_masked.append(x_all_zbins[index_zbin][maximal_mask.flatten()])
         y_masked.append(y_all_zbins[index_zbin][maximal_mask.flatten()])
-        e1_var = weighted_variance(e1_all_zbins[index_zbin][maximal_mask.flatten()], weights_all_zbins[index_zbin][maximal_mask.flatten()])
-        e2_var = weighted_variance(e2_all_zbins[index_zbin][maximal_mask.flatten()], weights_all_zbins[index_zbin][maximal_mask.flatten()])
-        sigma_int_est_sqr = (e1_var + e2_var) / 2.
+
         if sigma_int[index_zbin] == -1.:
+
+            # estimate e1 and e2 averages after applying all pixel masks:
+            e1_avg = np.sum(e1_avg_prep_all_zbins[index_zbin][maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+            e2_avg = np.sum(e2_avg_prep_all_zbins[index_zbin][maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+
+            # start 2nd data extraction with estimated e1_avg, e2_avg:
+            # some naming:
+            fname_binned = fname_control + names_zbins[index_zbin] + '.cat'
+
+            # load catalog:
+            # loading it again is probably more efficient than creating a 'list of catalogs' in the first loop...
+            table = fits.open(paths_to_data[index_zbin] + filename, memmap=True)
+            tbdata = table[1].data
+            cols = table[1].columns
+            # in order to do things correctly, I should return data unmasked and combine the masks here...
+            dummy1, dummy2, dummy3, dummy4, e1_var_prep, e2_var_prep, dummy5, dummy6, dummy7, dummy8, dummy9, dummy10, dummy11 = reduce_data(tbdata, cols, x_coords[index_zbin], y_coords[index_zbin], xmin, xmax, ymin, ymax, identifier=identifier, pixel_scale=pixel_scale, fname_control=fname_binned, min_num_elements_pix=min_num_elements_pix, index_zbin=index_zbin, e1_est_avg=e1_avg, e2_est_avg=e2_avg, column_names=column_names)
+
+            e1_var = np.sum(e1_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+            e2_var = np.sum(e2_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+
+            sigma_int_est_sqr = (e1_var + e2_var) / 2.
+
             # TODO: double check shot noise estimate --> yap: sigma^2 / N_eff is what we save in "shot_noise""
+            print 'Estimate for sigma_int1 (weights and masks fully propagated): \n', np.sqrt(sigma_int_est_sqr)
+            print 'Estimate for sigma_int2 (naive and directly from catalog): \n', np.sqrt(sigma_int_est_sqr_naive_all[index_zbin])
+            print 'Proceeding with sigma_int1!'
             shot_noise_masked.append(sigma_int_est_sqr / N_eff_all_zbins[index_zbin][maximal_mask.flatten()])
             # overwrite:
             sigma_int[index_zbin] = np.sqrt(sigma_int_est_sqr)
@@ -403,7 +429,7 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
 
     return np.asarray(data_masked), shot_noise_masked, field_props_all_zbins, np.asarray(x_masked), np.asarray(y_masked)
 
-def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='W2', pixel_scale=0.15, fname_control='your_name_here', min_num_elements_pix=1., index_zbin=1, column_names={}):
+def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='W2', pixel_scale=0.15, fname_control='your_name_here', min_num_elements_pix=1., e1_est_avg=0., e2_est_avg=0., index_zbin=1, column_names={}):
     '''This function is a copy of "get_data", except for the loading of the catalogs and the projection into the tangent-plane.
 
        @arguments:
@@ -470,6 +496,11 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
         weight = tbdata[column_names['weight']]
     else:
         weight = np.ones_like(RA)
+
+    e1_est_var = weighted_variance(e1, weight)
+    e2_est_var = weighted_variance(e2, weight)
+
+    sigma_int_est_sqr = (e1_est_var + e2_est_var) / 2.
 
     '''
     if 'm1' in cols.names and 'm2' in cols.names:
@@ -637,25 +668,34 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     m2_bias_avg = m2_bias_avg.T / sum_weight
 
     e1_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * e1)
-    g1_avg = e1_avg.T / sum_weight / (1. + m1_bias_avg)
+    e1_avg = e1_avg.T
+    g1_avg = e1_avg / sum_weight / (1. + m1_bias_avg)
 
     e2_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * e2)
-    g2_avg = e2_avg.T / sum_weight / (1. + m2_bias_avg)
+    e2_avg = e2_avg.T
+    g2_avg = e2_avg / sum_weight / (1. + m2_bias_avg)
 
-    weights_avg = sum_sqr_weight.T / sum_weight.T
+    e1_var_prep, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * (e1 - e1_est_avg)**2)
+    e1_var_prep = e1_var_prep.T
+
+    e2_var_prep, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * (e2 - e2_est_avg)**2)
+    e2_var_prep = e2_var_prep.T
+
+    #weights_avg = sum_sqr_weight / sum_weight
 
     #print 'g1_avg, g2_avg', g1_avg.shape, g2_avg.shape
 
     # TODO: Instead of regular grid of cell-midpoints use averaged x, y?!
-    x_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * x_rad)
-    x_avg = x_avg.T / sum_weight
+    # this would also require to make r and theta z-dependent...
+    #x_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * x_rad)
+    #x_avg = x_avg.T / sum_weight
 
-    y_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * y_rad)
-    y_avg = y_avg.T / sum_weight
+    #y_avg, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y], weights=weight * y_rad)
+    #y_avg = y_avg.T / sum_weight
 
-    #x_mid = bins_x[:-1] + np.diff(bins_x) / 2.
-    #y_mid = bins_y[:-1] + np.diff(bins_y) / 2.
-    #xx, yy = np.meshgrid(x_mid, y_mid)
+    x_mid = bins_x[:-1] + np.diff(bins_x) / 2.
+    y_mid = bins_y[:-1] + np.diff(bins_y) / 2.
+    xx, yy = np.meshgrid(x_mid, y_mid)
 
     print 'Shape of patch in bins:', xx.shape
     field_properties['field_shape_in_bins'] = xx.shape
@@ -716,4 +756,4 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     # shear = (g11, ..., g1n, g21, ..., g2n)
     #shear = np.concatenate((g1_avg.flatten(), g2_avg.flatten()))
 
-    return g1_avg.flatten(), g2_avg.flatten(), e1_avg.T.flatten(), e2_avg.T.flatten(), weights_avg.flatten(), N_eff.flatten(), field_properties, xx.flatten(), yy.flatten(), mask
+    return g1_avg.flatten(), g2_avg.flatten(), e1_avg.flatten(), e2_avg.flatten(), e1_var_prep.flatten(), e2_var_prep.flatten(), sum_weight.flatten(), sigma_int_est_sqr, N_eff.flatten(), field_properties, xx.flatten(), yy.flatten(), mask
