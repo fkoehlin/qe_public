@@ -911,9 +911,12 @@ if __name__ == '__main__':
     # needs to be a nested try-except-structure!
 
 
-    if ini.estimate_sigma_int:
+    if ini.estimate_sigma_int_avg:
         sigma_int = np.ones(nzbins) * -1.
-        print 'sigma_int will be estimated from data.'
+        print 'Intrinsic ellipticity dispersion, sigma_int, will be estimated from catalogue (i.e. averaged over full catalogue per z-bin).'
+    elif ini.estimate_sigma_int_pix:
+        sigma_int = np.ones(nzbins) * -2.
+        print 'Intrinsic ellipticity dispersion, sigma_int, will be estimated per shear pixel.'
     else:
         try:
             sigma_int = np.sqrt((np.asarray(ini.sigma_int_e1)**2 + np.asarray(ini.sigma_int_e2)**2) / 2.)
@@ -928,8 +931,10 @@ if __name__ == '__main__':
                 exit()
 
     # this is just for naming purposes:
-    if ini.estimate_sigma_int:
-        sigma_int_for_naming = 'sigma_int_est'
+    if ini.estimate_sigma_int_avg:
+        sigma_int_for_naming = 'sigma_int_est_avg'
+    elif ini.estimate_sigma_int_pix:
+        sigma_int_for_naming = 'sigma_int_est_pix'
     else:
         sigma_int_for_naming = 'sigma_int{:.2f}'.format(sigma_int[0])
 

@@ -394,7 +394,8 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
         x_masked.append(x_all_zbins[index_zbin][maximal_mask.flatten()])
         y_masked.append(y_all_zbins[index_zbin][maximal_mask.flatten()])
 
-        if sigma_int[index_zbin] == -1.:
+        # dummy values for two different cases of estimating sigma_int directly from data:
+        if (sigma_int[index_zbin] == -1.) or (sigma_int[index_zbin] == -2.):
 
             # estimate e1 and e2 averages after applying all pixel masks:
             e1_avg = np.sum(e1_avg_prep_all_zbins[index_zbin][maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
@@ -412,18 +413,31 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
             # in order to do things correctly, I should return data unmasked and combine the masks here...
             dummy1, dummy2, dummy3, dummy4, e1_var_prep, e2_var_prep, dummy5, dummy6, dummy7, dummy8, dummy9, dummy10, dummy11 = reduce_data(tbdata, cols, x_coords[index_zbin], y_coords[index_zbin], xmin, xmax, ymin, ymax, identifier=identifier, pixel_scale=pixel_scale, fname_control=fname_binned, min_num_elements_pix=min_num_elements_pix, index_zbin=index_zbin, e1_est_avg=e1_avg, e2_est_avg=e2_avg, column_names=column_names)
 
-            e1_var = np.sum(e1_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
-            e2_var = np.sum(e2_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+            # 1st case: average intrinsic ellipticity dispersion over full input catalogue (per z-bin)
+            if sigma_int[index_zbin] == -1.:
+                e1_var = np.sum(e1_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
+                e2_var = np.sum(e2_var_prep[maximal_mask.flatten()]) / np.sum(sum_weights_all_zbins[index_zbin][maximal_mask.flatten()])
 
-            sigma_int_est_sqr = (e1_var + e2_var) / 2.
+                sigma_int_est_sqr = (e1_var + e2_var) / 2.
 
-            # TODO: double check shot noise estimate --> yap: sigma^2 / N_eff is what we save in "shot_noise""
-            print 'Estimate for sigma_int1 (weights and masks fully propagated): \n', np.sqrt(sigma_int_est_sqr)
-            print 'Estimate for sigma_int2 (naive and directly from catalog): \n', np.sqrt(sigma_int_est_sqr_naive_all[index_zbin])
-            print 'Proceeding with sigma_int1!'
-            shot_noise_masked.append(sigma_int_est_sqr / N_eff_all_zbins[index_zbin][maximal_mask.flatten()])
-            # overwrite:
-            sigma_int[index_zbin] = np.sqrt(sigma_int_est_sqr)
+                # TODO: double check shot noise estimate --> yap: sigma^2 / N_eff is what we save in "shot_noise""
+                print 'Estimate for sigma_int1 (weights and masks fully propagated): \n', np.sqrt(sigma_int_est_sqr)
+                print 'Estimate for sigma_int2 (naive and directly from catalog): \n', np.sqrt(sigma_int_est_sqr_naive_all[index_zbin])
+                print 'Proceeding with sigma_int1!'
+                shot_noise_masked.append(sigma_int_est_sqr / N_eff_all_zbins[index_zbin][maximal_mask.flatten()])
+                # overwrite:
+                sigma_int[index_zbin] = np.sqrt(sigma_int_est_sqr)
+
+            # 2nd case: take intrinsic ellipticity dispersion per pixel and just apply mask
+            elif sigma_int[index_zbin] == -2.:
+                sigma_int_e1_sqr = e1_var_prep[maximal_mask.flatten()] / N_eff_all_zbins[index_zbin][maximal_mask.flatten()]
+                sigma_int_e2_sqr = e2_var_prep[maximal_mask.flatten()] / N_eff_all_zbins[index_zbin][maximal_mask.flatten()]
+
+                sigma_int_est_sqr = (sigma_int_e1_sqr + sigma_int_e2_sqr) / 2.
+                shot_noise_masked.append(np.sqrt(sigma_int_est_sqr))
+                # this won't work because the concatenation happens outside these functions since we always assume symmetrization of dispersions...
+                #shot_noise_masked.append(np.concatenate((np.sqrt(sigma_int_e1_sqr), np.sqrt(sigma_int_e2_sqr))))
+
         else:
             shot_noise_masked.append(sigma_int[index_zbin]**2 / N_eff_all_zbins[index_zbin][maximal_mask.flatten()])
 
