@@ -1,9 +1,19 @@
 #!/usr/bin/env python
 # encoding: UTF8
-# Code for estimating maximum likelihood band powers of the lensing power spectrum
-# following the "quadratic estimator" method by Hu & White 2001 (ApJ, 554, 67) 
-# implementation by Fabian Koehlinger
+"""
+.. module:: window_functions
+   :synopsis: Calculate the window functions of the multipole bands
 
+.. moduleauthor:: Fabian Koehlinger <fabian.koehlinger@ipmu.jp>
+
+Collection of functions needed to construct the window functions of the 
+multipole band powers.
+
+This module defines the class :class:`WindowFunctions`, that handles all the 
+calculations and returns the window functions per multipole or band.
+
+"""
+from __future__ import print_function
 #import sys
 #import os
 import numpy as np
@@ -12,6 +22,12 @@ import scipy.interpolate as interpolate
 import scipy.special as special
 #import time
 import multiprocessing
+
+# Python 2.x - 3.x compatibility: Always use more efficient range function
+try:
+    xrange
+except NameError:
+    xrange = range
 
 @np.vectorize
 def _sph_jn(n, x, derivative=False):
@@ -138,9 +154,6 @@ class WindowFunctions(object):
     
     def getWindowFunction(self, l, n):
         
-        #if self.sigma != sigma:
-        #    print 'Fatal error!!!'
-        #    exit()
         if n == 0:
             return self.w0(l) / self.norm0
         if n == 4:
@@ -257,7 +270,7 @@ if __name__ == '__main__':
     nells = int(ell_max - ell_min + 1)
     ells = np.linspace(ell_min, ell_max, nells)
     #ells = ells_intp
-    #print ells
+    #print(ells)
     WF1 = WindowFunctions(sigma=sigma_pix, l_min=ells_intp.min(), l_max=ells_intp.max(), number_nodes=nells_intp, ncpus=1)
     WF2 = WindowFunctionsSimple(sigma=sigma_pix)
     
@@ -269,13 +282,13 @@ if __name__ == '__main__':
     w4_2 = WF2.getWindowFunction(ells, 4)
     w8_2 = WF2.getWindowFunction(ells, 8)
     
-    #print (w0_1 - w0_2) / w0_2
-    #print (w4_1 - w4_2) / w4_2
-    #print (w8_1 - w8_2) / w8_2    
+    #print((w0_1 - w0_2) / w0_2)
+    #print((w4_1 - w4_2) / w4_2)
+    #print((w8_1 - w8_2) / w8_2)
     
-    print w0_2
-    print w4_2
-    print w8_2    
+    print(w0_2)
+    print(w4_2)
+    print(w8_2)
     
     # this should reproduce Hu & White's Fig. 2:
     plt.plot(ells_intp / ell_pix, w0_1, ls='-', color='black', label=r'$n=0$')

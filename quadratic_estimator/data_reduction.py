@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 # encoding: UTF8
-# Code for estimating maximum likelihood band powers of the lensing power spectrum
-# following the "quadratic estimator" method by Hu & White 2001 (ApJ, 554, 67)
-# implementation by Fabian Koehlinger
+"""
+.. module:: data_reduction
+   :synopsis: Extract data from chains and produce plots
 
+.. moduleauthor:: Fabian Koehlinger <fabian.koehlinger@ipmu.jp>
+
+Collection of functions needed to set up the shear catalogs for extracting
+band powers with the quadratic estimator method.
+
+"""
+from __future__ import print_function
 import os
 import numpy as np
 #import scipy.integrate as integrate
@@ -15,6 +22,12 @@ import astropy.io.fits as fits
 # this is better for timing than "time"
 #import time
 from timeit import default_timer as timer
+
+# Python 2.x - 3.x compatibility: Always use more efficient range function
+try:
+    xrange
+except NameError:
+    xrange = range
 
 def weighted_variance(values, weights):
     '''Return the weighted average and standard deviation.
@@ -155,7 +168,7 @@ def get_tangent_plane_coords(RA, Dec, tangent_point=None, mode='data'):
     alpha0 = np.deg2rad(RA0)
     delta0 = np.deg2rad(Dec0)
 
-    print 'Tangent point: RA = {:.5f} deg, Dec = {:.5f} deg'.format(RA0, Dec0)
+    print('Tangent point: RA = {:.5f} deg, Dec = {:.5f} deg'.format(RA0, Dec0))
 
     A = np.cos(delta) * np.cos(alpha - alpha0)
     # ATTENTION: F carries a sign, too, depending on the signs of d0 and d!
@@ -224,10 +237,10 @@ def get_tangent_point(arc1=((2., -2.), (-2., 2.)), arc2=((2., 2.), (-2., -2.))):
     RA2 = np.rad2deg(np.arctan2(intersection_point2[1], intersection_point2[0]))
     Dec2 = np.rad2deg(np.arcsin(intersection_point2[2]))
 
-    #print 'First intersection point:'
-    #print RA1, Dec1
-    #print 'Second intersection point:'
-    #print RA2, Dec2
+    #print('First intersection point:')
+    #print(RA1, Dec1)
+    #print('Second intersection point:')
+    #print(RA2, Dec2)
 
     # Take care of negative RA!
     if RA1 < 0.:
@@ -236,10 +249,10 @@ def get_tangent_point(arc1=((2., -2.), (-2., 2.)), arc2=((2., 2.), (-2., -2.))):
     if RA2 < 0.:
         RA2 += 360.
 
-    #print 'First intersection point:'
-    #print RA1, Dec1
-    #print 'Second intersection point:'
-    #print RA2, Dec2
+    #print('First intersection point:')
+    #print(RA1, Dec1)
+    #print('Second intersection point:')
+    #print(RA2, Dec2)
 
     RA_min = min(arc1[0][0], arc1[1][0], arc2[0][0], arc2[1][0])
     RA_max = max(arc1[0][0], arc1[1][0], arc2[0][0], arc2[1][0])
@@ -248,19 +261,19 @@ def get_tangent_point(arc1=((2., -2.), (-2., 2.)), arc2=((2., 2.), (-2., -2.))):
     Dec_max = max(arc1[0][1], arc1[1][1], arc2[0][1], arc2[1][1])
 
     '''
-    print RA_min, RA_max
-    print Dec_min, Dec_max
+    print(RA_min, RA_max)
+    print(Dec_min, Dec_max)
     '''
     # check that RA, Dec is contained in arcs:
     if RA1 >= RA_min and RA1 <= RA_max and Dec1 >= Dec_min and Dec1 <= Dec_max:
 
-        #print 'Tangent point will be first intersection point.'
+        #print('Tangent point will be first intersection point.')
 
         return RA1, Dec1
 
     else:
 
-        #print 'Tangent point will be second intersection point.'
+        #print('Tangent point will be second intersection point.')
 
         return RA2, Dec2
 
@@ -289,12 +302,12 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
         try:
             header = table[0].header
             tangent_point = (header['TP_ALPHA_J2000'], header['TP_DELTA_J2000'])
-            print 'Read tangent point from FITS-header which is expected to be global (i.e. independent of any catalog cuts).'
+            print('Read tangent point from FITS-header which is expected to be global (i.e. independent of any catalog cuts).')
         except:
             # we calculate the tangent point for lowest tomographic bin and pass it on to all other bins!
             tangent_point = None
             if mode == 'data':
-                print 'Could not read a global tangent point from FITS-header. Calculating it now for first redshift bin and pass it on.'
+                print('Could not read a global tangent point from FITS-header. Calculating it now for first redshift bin and pass it on.')
 
         #RA = tbdata['ALPHA_J2000']
         #Dec = tbdata['DELTA_J2000']
@@ -328,8 +341,8 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
     xmin = xmins.max()
     ymin = ymins.max()
 
-    #print xmins, xmin
-    #print ymins, ymin
+    #print(xmins, xmin)
+    #print(ymins, ymin)
 
     # minimal overlap between zbins!!!
     xmax = xmaxs.min()
@@ -421,9 +434,9 @@ def get_data(paths_to_data, filename, names_zbins=['0.50z0.85', '0.85z1.30'], id
                 sigma_int_est_sqr = (e1_var + e2_var) / 2.
 
                 # TODO: double check shot noise estimate --> yap: sigma^2 / N_eff is what we save in "shot_noise""
-                print 'Estimate for sigma_int1 (weights and masks fully propagated): \n', np.sqrt(sigma_int_est_sqr)
-                print 'Estimate for sigma_int2 (naive and directly from catalog): \n', np.sqrt(sigma_int_est_sqr_naive_all[index_zbin])
-                print 'Proceeding with sigma_int1!'
+                print('Estimate for sigma_int1 (weights and masks fully propagated): \n', np.sqrt(sigma_int_est_sqr))
+                print('Estimate for sigma_int2 (naive and directly from catalog): \n', np.sqrt(sigma_int_est_sqr_naive_all[index_zbin]))
+                print('Proceeding with sigma_int1!')
                 shot_noise_masked.append(sigma_int_est_sqr / N_eff_all_zbins[index_zbin][maximal_mask.flatten()])
                 # overwrite:
                 sigma_int[index_zbin] = np.sqrt(sigma_int_est_sqr)
@@ -582,25 +595,25 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     dist_flat = get_distances(xmin, ymin, xmax, ymax)
     dist_sph = get_angular_distances(RA_min, Dec_min, RA_max, Dec_max, deg=False)[0]
 
-    print 'Max distance between tangent-plane coordinates (theta_x, theta_y): {:.4f} rad'.format(dist_flat)
-    print 'Max distance between polar coordinates (alpha, delta): {:.4f} rad'.format(dist_sph)
-    print 'Fractional difference between flat and spherical distance: {:.2f}%'.format(np.abs(dist_flat - dist_sph) / dist_sph * 100.)
+    print('Max distance between tangent-plane coordinates (theta_x, theta_y): {:.4f} rad'.format(dist_flat))
+    print('Max distance between polar coordinates (alpha, delta): {:.4f} rad'.format(dist_sph))
+    print('Fractional difference between flat and spherical distance: {:.2f}%'.format(np.abs(dist_flat - dist_sph) / dist_sph * 100.))
 
     # tangent-plane coordinates are centred around 0!
     length_x = np.abs(xmin) + np.abs(xmax)
     length_y = np.abs(ymin) + np.abs(ymax)
 
-    #print xmin, xmax, ymin, ymax
+    #print(xmin, xmax, ymin, ymax)
 
     # alternative to np.arange:
     nbins_x = length_x / scale
     nbins_y = length_y / scale
 
-    #print nbins_x, nbins_y
+    #print(nbins_x, nbins_y)
     bins_x, steps = np.linspace(xmin, xmax, int(nbins_x), retstep=True)
-    #print np.rad2deg(steps)
+    #print(np.rad2deg(steps))
     bins_y, steps = np.linspace(ymin, ymax, int(nbins_y), retstep=True)
-    #print np.rad2deg(steps)
+    #print(np.rad2deg(steps))
 
     # np.arange is described to be unreliable for non-integer steps...
     bins_x_alt = np.arange(xmin, xmax, scale)
@@ -613,25 +626,25 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     #np.savetxt('control_outputs/'+identifier+'_bins_arange.dat', np.column_stack((bins_x, bins_y)), header=header)
 
     '''
-    print 'xmin, xmax:', xmin, xmax
-    print 'linspace x: \n', bins_x
-    print 'arange x: \n', bins_x_alt
-    print 'n linspace, n arange: \n', bins_x.size, bins_x_alt.size
-    print 'step size linspace: \n', np.rad2deg(np.diff(bins_x))
-    print 'step size arange: \n', np.rad2deg(np.diff(bins_x_alt))
+    print('xmin, xmax:', xmin, xmax)
+    print('linspace x: \n', bins_x)
+    print('arange x: \n', bins_x_alt)
+    print('n linspace, n arange: \n', bins_x.size, bins_x_alt.size)
+    print('step size linspace: \n', np.rad2deg(np.diff(bins_x)))
+    print('step size arange: \n', np.rad2deg(np.diff(bins_x_alt)))
 
 
-    print 'ymin, ymax:', ymin, ymax
-    print 'linspace y: \n', bins_y
-    print 'arange y: \n', bins_y_alt
-    print 'n linspace, n arange: \n', bins_y.size, bins_y_alt.size
-    print 'step size linspace: \n', np.rad2deg(np.diff(bins_y))
-    print 'step size arange: \n', np.rad2deg(np.diff(bins_y_alt))
+    print('ymin, ymax:', ymin, ymax)
+    print('linspace y: \n', bins_y)
+    print('arange y: \n', bins_y_alt)
+    print('n linspace, n arange: \n', bins_y.size, bins_y_alt.size)
+    print('step size linspace: \n', np.rad2deg(np.diff(bins_y)))
+    print('step size arange: \n', np.rad2deg(np.diff(bins_y_alt)))
     '''
 
     #exit()
-    #print 'x_bins', bins_x.shape
-    #print 'y_bins', bins_y.shape
+    #print('x_bins', bins_x.shape)
+    #print('y_bins', bins_y.shape)
 
     bins_x = bins_x_alt
     bins_y = bins_y_alt
@@ -641,19 +654,19 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     scale_x = np.diff(bins_x)[0]
     scale_y = np.diff(bins_y)[0]
 
-    print 'Length of field (x) = {:.5} deg'.format(np.rad2deg(length_x))
-    print 'Length of field (y) = {:.5} deg'.format(np.rad2deg(length_y))
-    print '1pix (length in x) = {:.2} deg'.format(np.rad2deg(scale_x))
-    print '1pix (length in y) = {:.2} deg'.format(np.rad2deg(scale_y))
+    print('Length of field (x) = {:.5} deg'.format(np.rad2deg(length_x)))
+    print('Length of field (y) = {:.5} deg'.format(np.rad2deg(length_y)))
+    print('1pix (length in x) = {:.2} deg'.format(np.rad2deg(scale_x)))
+    print('1pix (length in y) = {:.2} deg'.format(np.rad2deg(scale_y)))
 
     field_area_arcmin = np.rad2deg(length_x) * np.rad2deg(length_y) * 3600. # in arcmin^2
     field_area_deg = np.rad2deg(length_x) * np.rad2deg(length_y) # in deg^2
     cell_area_arcmin = np.rad2deg(scale_x) * np.rad2deg(scale_y) * 3600. # in arcmin^2
     cell_area_deg = np.rad2deg(scale_x) * np.rad2deg(scale_y) # in deg^2
-    print 'Field area = {:.6} arcmin^2'.format(field_area_arcmin)
-    print 'Field area = {:.6} deg^2'.format(field_area_deg)
-    print 'Cell area = {:.6} arcmin^2'.format(cell_area_arcmin)
-    print 'Cell area = {:.6} deg^2'.format(cell_area_deg)
+    print('Field area = {:.6} arcmin^2'.format(field_area_arcmin))
+    print('Field area = {:.6} deg^2'.format(field_area_deg))
+    print('Cell area = {:.6} arcmin^2'.format(cell_area_arcmin))
+    print('Cell area = {:.6} deg^2'.format(cell_area_deg))
 
     field_properties['borders_x'] = (np.rad2deg(xmin), np.rad2deg(xmax))
     field_properties['borders_y'] = (np.rad2deg(ymin), np.rad2deg(ymax))
@@ -666,7 +679,7 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     N_obj_per_pixel, bins_x, bins_y = np.histogram2d(x_rad, y_rad, bins=[bins_x, bins_y])
 
     field_properties['npixel'] = sum_weight.size
-    #print bins_x.shape, bins_y.shape
+    #print(bins_x.shape, bins_y.shape)
 
     sum_weight = sum_weight.T
     sum_sqr_weight = sum_sqr_weight.T
@@ -697,7 +710,7 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
 
     #weights_avg = sum_sqr_weight / sum_weight
 
-    #print 'g1_avg, g2_avg', g1_avg.shape, g2_avg.shape
+    #print('g1_avg, g2_avg', g1_avg.shape, g2_avg.shape)
 
     # TODO: Instead of regular grid of cell-midpoints use averaged x, y?!
     # this would also require to make r and theta z-dependent...
@@ -711,7 +724,7 @@ def reduce_data(tbdata, cols, x_rad, y_rad, xmin, xmax, ymin, ymax, identifier='
     y_mid = bins_y[:-1] + np.diff(bins_y) / 2.
     xx, yy = np.meshgrid(x_mid, y_mid)
 
-    print 'Shape of patch in bins:', xx.shape
+    print('Shape of patch in bins:', xx.shape)
     field_properties['field_shape_in_bins'] = xx.shape
 
     # two options:

@@ -1,14 +1,24 @@
 #!/usr/bin/env python
 # encoding: UTF8
-# Code for estimating maximum likelihood band powers of the lensing power spectrum
-# following the "quadratic estimator" method by Hu & White 2001 (ApJ, 554, 67) 
-# implementation by Fabian Koehlinger
+"""
+.. module:: signal_matrix
+   :synopsis: Calculate the theoretical shear correlation matrix
 
+.. moduleauthor:: Fabian Koehlinger <fabian.koehlinger@ipmu.jp>
+
+Collection of functions needed to construct the theoretical shear correlation
+matrix that is used within the quadratic estimator.
+
+This module defines the class :class:`SignalMatrix`, that handles all the 
+calculations and returns the shear signal matrix.
+
+"""
+from __future__ import print_function
 #import sys
 #import os
 import numpy as np
 #import scipy.integrate as integrate
-import scipy.interpolate as interpolate
+#import scipy.interpolate as interpolate
 import scipy.special as special
 import multiprocessing
 #import itertools
@@ -17,6 +27,12 @@ import window_functions as wf
 # this is better for timing than "time"
 #import time
 from timeit import default_timer as timer
+
+# Python 2.x - 3.x compatibility: Always use more efficient range function
+try:
+    xrange
+except NameError:
+    xrange = range
 
 # maximum number of substeps in integration routine:
 #global LIMIT
@@ -99,6 +115,8 @@ class SignalMatrix(object):
             self.w0 = WF.getWindowFunction(self.ell, n=0)
             self.w4 = WF.getWindowFunction(self.ell, n=4)
             
+        return
+            
     def getSignalMatrix(self, x, y):
         """
         x, y are supposed to be coordinates of (square) full 2D-field and should 
@@ -115,7 +133,7 @@ class SignalMatrix(object):
         # create position vector (r,phi):
         pos = np.column_stack((r_flat, phi_flat))
         #t0 = timer()
-        print 'Total number of (r, phi):', r_flat.size
+        print('Total number of (r, phi):', r_flat.size)
 
         # indices and calculate 11-element etc. separately (i.e. reverse pixel indices with shear-component indices!)
         # be nice and don't steal all CPUs by default...
@@ -129,13 +147,13 @@ class SignalMatrix(object):
         pool = multiprocessing.Pool(processes=take_cpus)
         #Try to use pathos...didn't work...
         #pool = PathosPool(processes=cpus)
-        print 'Started with calculation of matrix elements on {:} cores.'.format(take_cpus)
+        print('Started with calculation of matrix elements on {:} cores.'.format(take_cpus))
         t0 = timer()
         # make this independent of GLOBAL variables/functions (i.e. band_min, band_max, band, moment) eventually:
         result = np.asarray(pool.map(unwrap_calculate, zip([self] * len(pos[:, 0]), zip(pos[:, 0], pos[:, 1]))))
         #result = np.asarray(pool.map(unwrap_calculate, itertools.izip(itertools.repeat(self), zip(unique_pos[:,0], unique_pos[:,1]))))
         pool.close()
-        print 'Done. Time: {:.2f}s.'.format(timer() - t0)
+        print('Done. Time: {:.2f}s.'.format(timer() - t0))
         matrix_11 = result[:, 0]
         matrix_12 = result[:, 1]
         matrix_22 = result[:, 2]
@@ -145,24 +163,11 @@ class SignalMatrix(object):
         block_22 = np.asmatrix(matrix_22.reshape(r.shape))
         block_12 = np.asmatrix(matrix_12.reshape(r.shape))
     
-        print 'Shape of r (and phi):', r.shape, phi.shape
-        print 'Shape of one block in matrix:', np.shape(block_11)
-        # block_12 = block_21
-        '''
-        # TODO: Write out in FITS & solve overwriting!        
-        # output for testing
-        # file will be overwritten for more than 1 ell- and redshift bin!                    
-        # create dummy indices:
-        x = range(len(r))
-        xx, yy = np.meshgrid(x, x)
-        header = 'x, y, dist, angle, block_11, block_12, block_22'        
-        savedata = np.column_stack((xx.flatten(), yy.flatten(), r.flatten(), phi.flatten(), np.asarray(block_11).flatten(), np.asarray(block_12).flatten(), np.asarray(block_22).flatten()))
-        path = 'cache/' #'/net/delft/data2/Sandbox/neutrinos/common/'
-        np.savetxt(path + 'blocks_SLOW.dat', savedata, header=header)
-        '''        
+        print('Shape of r (and phi):', r.shape, phi.shape)
+        print('Shape of one block in matrix:', np.shape(block_11))
         # block_12 = block_21 !!!
         matrix = np.bmat('block_11, block_12; block_12, block_22')
-        print 'Shape of matrix:', np.shape(matrix)
+        print('Shape of matrix:', np.shape(matrix))
     
         return matrix
         
@@ -184,12 +189,12 @@ class SignalMatrix(object):
         #t0 = timer()
         # find unique elements in that position vector:
         unique_pos, index_unique = self.unique_rows(pos)
-        #print 'Time solution:', timer()-start
-        #print unique_pos, unique_pos.shape
-        #print index_unique
-        #print 'Unique positions:', unique_pos
-        print 'Total number of (r, phi):', r_flat.size
-        print 'Number of unique (r, phi):', index_unique.size
+        #print('Time solution:', timer()-start)
+        #print(unique_pos, unique_pos.shape)
+        #print(index_unique)
+        #print('Unique positions:', unique_pos)
+        print('Total number of (r, phi):', r_flat.size)
+        print('Number of unique (r, phi):', index_unique.size)
 
         # indices and calculate 11-element etc. separately (i.e. reverse pixel indices with shear-component indices!)
         # be nice and don't steal all CPUs by default...
@@ -204,13 +209,13 @@ class SignalMatrix(object):
         pool = multiprocessing.Pool(processes=take_cpus)
         #Try to use pathos...didn't work...
         #pool = PathosPool(processes=cpus)
-        print 'Started with calculation of matrix elements on {:} cores.'.format(take_cpus)
+        print('Started with calculation of matrix elements on {:} cores.'.format(take_cpus))
         t0 = timer()
         # make this independent of GLOBAL variables/functions (i.e. band_min, band_max, band, moment) eventually:
         result = np.asarray(pool.map(unwrap_calculate, zip([self] * len(unique_pos[:, 0]), zip(unique_pos[:, 0], unique_pos[:, 1]))))
         #result = np.asarray(pool.map(unwrap_calculate, itertools.izip(itertools.repeat(self), zip(unique_pos[:,0], unique_pos[:,1]))))
         pool.close()
-        print 'Done. Time: {:.2f}s.'.format(timer() - t0)
+        print('Done. Time: {:.2f}s.'.format(timer() - t0))
         unique_elements_11 = result[:, 0]
         unique_elements_12 = result[:, 1]
         unique_elements_22 = result[:, 2]
@@ -235,7 +240,7 @@ class SignalMatrix(object):
                     matrix_12[i] = unique_elements_12[j]
         '''
         # this is MUCH faster and should yield same output as nested loop from above:
-        for i in range(index_unique.size):
+        for i in xrange(index_unique.size):
             k = np.where(unique_pos[i, 0] == r_flat)[0]
             l = np.where(unique_pos[i, 1] == phi_flat)[0]
             j = np.intersect1d(k, l)
@@ -243,31 +248,18 @@ class SignalMatrix(object):
             matrix_22[j] = unique_elements_22[i]
             matrix_12[j] = unique_elements_12[i]
         #'''
-        print 'Time for filling matrix: {:.2f}s.'.format(timer() - t0)
+        print('Time for filling matrix: {:.2f}s.'.format(timer() - t0))
     
         # put block elements together:
         block_11 = np.asmatrix(matrix_11.reshape(r.shape))
         block_22 = np.asmatrix(matrix_22.reshape(r.shape))
         block_12 = np.asmatrix(matrix_12.reshape(r.shape))
     
-        print 'Shape of r (and phi):', r.shape, phi.shape
-        print 'Shape of one block in matrix:', np.shape(block_11)
-        # block_12 = block_21
-        '''        
-        # TODO: Write out in FITS & solve overwriting!        
-        # output for testing
-        # file will be overwritten for more than 1 ell- and redshift bin!                    
-        # create dummy indices:        
-        x = range(len(r))
-        xx, yy = np.meshgrid(x, x)
-        header = 'x, y, dist, angle, block_11, block_12, block_22'
-        savedata = np.column_stack((xx.flatten(), yy.flatten(), r.flatten(), phi.flatten(), np.asarray(block_11).flatten(), np.asarray(block_12).flatten(), np.asarray(block_22).flatten()))
-        path = 'cache/' #'/net/delft/data2/Sandbox/neutrinos/common/'
-        np.savetxt(path + 'blocks_FAST.dat', savedata, header=header)
-        '''        
+        print('Shape of r (and phi):', r.shape, phi.shape)
+        print('Shape of one block in matrix:', np.shape(block_11))
         # block_12 = block_21 !!!
         matrix = np.bmat('block_11, block_12; block_12, block_22')
-        print 'Shape of matrix:', np.shape(matrix)
+        print('Shape of matrix:', np.shape(matrix))
     
         return matrix     
 
@@ -278,7 +270,7 @@ class SignalMatrix(object):
     
         r = position[0]
         phi = position[1]
-        #print 'r, phi', r, phi
+        #print('r, phi', r, phi)
         
         # this is still suboptimal since interpolation is created for each position per process...
         # but it avoids the pickling issue (with standard multiprocessing...)
@@ -289,7 +281,7 @@ class SignalMatrix(object):
         #self.w0_int = interpolate.interp1d(self.l_nodes, self.w0, kind=KIND_INTERPOL)
         #self.w4_int = interpolate.interp1d(self.l_nodes, self.w4, kind=KIND_INTERPOL)
         
-        #print 'Time for interpolation:', timer()-start_interpol
+        #print('Time for interpolation:', timer()-start_interpol)
         #'''
         
         if self.integrate:
@@ -316,11 +308,11 @@ class SignalMatrix(object):
                 unique_elements_12 = self.matrixelement_12_EB(r, phi)
                 unique_elements_22 = self.matrixelement_22_EB(r, phi)
             else:
-                print 'No valid mode (EE, BB, EB) specified.'
+                print('No valid mode (EE, BB, EB) specified.')
                 exit()
         else:
             #ell = self.band_min
-            #print 'no integration, l={:}'.format(l)
+            #print('no integration, l={:}'.format(l))
             if self.band == 'EE':
                 unique_elements_11 = self.integrand_element_11_EE(self.ell, r, phi)
                 unique_elements_12 = self.integrand_element_12_EE(self.ell, r, phi)
@@ -334,7 +326,7 @@ class SignalMatrix(object):
                 unique_elements_12 = self.integrand_element_12_EB(self.ell, r, phi)
                 unique_elements_22 = self.integrand_element_22_EB(self.ell, r, phi)
             else:
-                print 'No valid mode (EE, BB, EB) specified.'
+                print('No valid mode (EE, BB, EB) specified.')
                 exit()
                 
         return unique_elements_11, unique_elements_12, unique_elements_22
@@ -453,7 +445,7 @@ class SignalMatrix(object):
             
     def integrand_element_11_EE(self, l, r, phi):
     
-        #print 'l:', l
+        #print('l:', l)
         
         # this is not optimal, but somehow "pickle" can't handle the passing of an object...
         # takes also much longer (which makes sense, since the interpolation is constructed at each step of the integration...)
